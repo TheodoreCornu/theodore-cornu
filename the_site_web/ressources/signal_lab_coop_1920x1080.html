@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Signal — Mini-jeu coopératif</title>
+  <style>
+    :root{--bg:#f5f6f8;--white:#fff;--ink:#18212b;--muted:#626e7a;--border:#d9dfe6;--grid:#e7ebf0;--blue:#2664dc;--orange:#cc5c29;--phase:#7a4ed2;--green:#237b4b;--red:#b54646}
+    *{box-sizing:border-box}
+    html{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+    body{margin:0;min-height:100vh}
+    button,input{font:inherit}
+    button{cursor:pointer}
+    button:focus-visible,input:focus-visible{outline:3px solid #7aa8ff;outline-offset:2px}
+    .app{max-width:1460px;margin:0 auto;padding:29px 28px 48px}
+    .setup{display:flex;align-items:end;justify-content:space-between;flex-wrap:wrap;gap:16px;border:1px solid var(--border);background:var(--white);padding:17px 19px;border-radius:12px;margin-bottom:18px}
+    .field-label{display:block;font-size:12px;font-weight:700;margin:0 0 9px}
+    .modes{display:flex;gap:5px;background:#f0f2f5;padding:4px;border-radius:9px;flex-wrap:wrap}
+    .mode{background:transparent;border:1px solid transparent;padding:9px 13px;border-radius:7px;font-size:13px;font-weight:600;color:#5b6775}
+    .mode.active{background:#fff;border-color:#d4dce5;color:#141d27;box-shadow:0 1px 2px #0000000d}
+    .code-group{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+    .code-input{width:132px;border:1px solid #bcc6d0;background:#fff;border-radius:7px;padding:10px 11px;text-align:center;font:700 17px ui-monospace,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase;height:42px}
+    .btn{background:#fff;border:1px solid #ccd4dd;border-radius:7px;min-height:42px;padding:10px 13px;color:#26323e;font-size:13px;font-weight:650}
+    .btn:hover{background:#f3f6fa}
+    .btn-primary{background:#1c2938;color:#fff;border-color:#1c2938}
+    .btn-primary:hover{background:#34465c}
+    .message-top{font-size:12px;color:var(--red);margin:7px 0 -6px;min-height:0}
+    .workspace{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+    .panel{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;min-width:0}
+    .panel-head{padding:19px 20px 11px;display:flex;align-items:start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .panel-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .print-btn{min-height:32px;padding:6px 9px;font-size:11px}
+    .print-code{display:none;font-size:13px;font-weight:650;margin:0 0 12px;letter-spacing:.07em}
+    .panel h2{font-size:19px;letter-spacing:-.025em;margin:0 0 4px}
+    .panel-head p{font-size:12px;color:var(--muted);margin:0}
+    .role-tag{font-size:12px;font-weight:700;background:#edf3ff;color:#2459b0;padding:6px 9px;border-radius:6px}
+    .panel.operator .role-tag{background:#fff2eb;color:#aa4d24}
+    .plot-section{padding:0 15px 18px}
+    .phase-readout{display:flex;align-items:center;gap:8px;margin:7px 5px 9px;font-size:12px;flex-wrap:wrap}
+    .phase-symbol{height:11px;width:11px;background:var(--phase);display:inline-block;transform:rotate(45deg);border-radius:2px}
+    .phase-readout strong{font-size:13px;font-weight:800;color:#5732a6}
+    .phase-readout .note{color:var(--muted);margin-left:auto;font-size:11px}
+    .plot{border:1px solid var(--border);border-radius:8px;background:#fff;overflow:hidden}
+    canvas{display:block;width:100%;height:340px;cursor:default;touch-action:auto}
+    .controls{margin-top:18px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:19px 20px}
+    .controls-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:17px}
+    .controls h2{font-size:17px;letter-spacing:-.015em;margin:0}
+    .controls-header span{font-size:12px;color:var(--muted)}
+    .control-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+    .control{border:1px solid var(--border);padding:15px;border-radius:9px;min-width:0}
+    .control-title{display:flex;align-items:center;gap:8px;min-height:24px}
+    .control-title svg{flex-shrink:0}
+    .control-title strong{font-size:14px}
+    .control p{margin:5px 0 16px;color:var(--muted);font-size:12px;min-height:16px}
+    .knob-area{display:flex;flex-direction:column;align-items:center;gap:4px;padding:0 0 2px}
+    .dial{width:152px;height:152px;border:0;background:transparent;padding:0;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;outline-offset:-4px;border-radius:50%}
+    .dial:active{cursor:grabbing}
+    .dial svg{display:block;width:100%;height:100%;overflow:visible}
+    .dial .dial-tick{stroke:#a8b3bf;stroke-width:2.5;stroke-linecap:round}
+    .dial .dial-tick.active{stroke:#18212b;stroke-width:4}
+    .dial .dial-face{fill:#fff;stroke:#c5cdd7;stroke-width:2}
+    .dial .dial-pointer{stroke:#1c2938;stroke-width:5;stroke-linecap:round}
+    .dial .dial-hub{fill:#1c2938}
+    .dial-value{font-size:23px;font-weight:750;line-height:1.2;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+    .dial-subvalue{font-size:12px;color:var(--muted);height:16px}
+    .dial-scale{width:100%;max-width:285px;display:flex;justify-content:space-between;gap:2px;margin-top:10px;color:var(--muted)}
+    .dial-scale span{font-size:11px;min-width:0;text-align:center;font-variant-numeric:tabular-nums}
+    .dial-scale span.active{color:var(--ink);font-weight:800}
+    .control-note{margin-top:9px;color:var(--muted);font-size:11px;text-align:center}
+    .validate-row{display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap;margin-top:18px;padding-top:15px;border-top:1px solid var(--border)}
+    .result{font-size:13px;color:var(--muted);line-height:1.5;flex:1;min-width:200px}
+    .result.ok{color:var(--green);font-weight:700}
+    .result.no{color:var(--red);font-weight:700}
+    .instructions{font-size:12px;color:var(--muted);line-height:1.6;margin:17px 2px 0}
+    .instructions strong{color:var(--ink)}
+    .role-expert #operator-panel,.role-expert #control-panel{display:none}
+    .role-technician #reference-panel{display:none}
+    .role-expert .workspace,.role-technician .workspace{grid-template-columns:minmax(0,850px);justify-content:center}
+    .role-technician #control-panel{max-width:850px;margin-left:auto;margin-right:auto}
+    @media(max-width:1000px){.workspace{grid-template-columns:1fr}.control-grid{grid-template-columns:1fr}.control p{min-height:0;margin-bottom:10px}.controls{margin-top:14px}}
+    @media(max-width:600px){.app{padding:17px 11px 32px}.setup{padding:13px}.panel-head{padding:15px 14px 8px}.plot-section{padding:0 7px 13px}canvas{height:305px}.controls{padding:14px}.dial{width:144px;height:144px}.phase-readout .note{width:100%;margin:0}.mode{padding:9px}.code-input{width:119px}}
+    /* Présentation desktop : une seule page sur un écran 16:9, sans masquer le contenu. */
+    @media(min-width:1001px){
+      .app{max-width:1600px;padding:18px 26px 18px}
+      .setup{padding:11px 16px;margin-bottom:12px;gap:12px}
+      .field-label{margin-bottom:6px}
+      .mode{padding:7px 12px}
+      .code-input{height:38px;padding:7px 10px}
+      .btn{min-height:38px;padding:8px 12px}
+      .print-btn{min-height:30px;padding:5px 9px}
+      .message-top{margin:4px 0 6px}
+      .message-top:empty{display:none}
+      .workspace{gap:14px}
+      .panel-head{padding:13px 16px 7px}
+      .panel h2{font-size:17px}
+      .plot-section{padding:0 11px 12px}
+      .phase-readout{margin:4px 5px 7px}
+      canvas{height:clamp(245px,27.5vh,305px)}
+      .controls{margin-top:12px;padding:12px 15px}
+      .controls-header{margin-bottom:9px}
+      .control-grid{gap:11px}
+      .control{padding:9px 12px}
+      .control p{margin:3px 0 7px}
+      .knob-area{gap:2px}
+      .dial{width:clamp(106px,11.9vh,130px);height:clamp(106px,11.9vh,130px)}
+      .dial-value{font-size:21px}
+      .dial-scale{margin-top:5px}
+      .control-note{margin-top:5px}
+      .validate-row{margin-top:10px;padding-top:10px}
+      .instructions{margin-top:10px;line-height:1.45;font-size:11px}
+    }
+    @media(prefers-reduced-motion:no-preference){.btn,.mode{transition:background-color .12s,border-color .12s}}
+    @media print{
+      @page{size:A4 landscape;margin:14mm}
+      body{background:white!important}
+      .app{max-width:none;padding:0}
+      .setup,.message-top,.controls,.instructions,#operator-panel,.print-btn{display:none!important}
+      .workspace{display:block!important}
+      #reference-panel{display:block!important;max-width:none;border:0;border-radius:0}
+      .panel-head{padding:0 0 14px}
+      .print-code{display:block}
+      .plot-section{padding:0}
+      .plot{border:1px solid #cbd3de}
+      canvas{height:340px!important}
+    }
+  </style>
+</head>
+<body class="role-lab">
+  <div class="app">
+    <section class="setup" aria-label="Configuration">
+      <div>
+        <span class="field-label">Vue</span>
+        <div class="modes" role="group" aria-label="Choisir la vue">
+          <button class="mode active" type="button" data-role="lab" aria-pressed="true">Test complet</button>
+          <button class="mode" type="button" data-role="expert" aria-pressed="false">Boss</button>
+          <button class="mode" type="button" data-role="technician" aria-pressed="false">Employé</button>
+        </div>
+      </div>
+      <div>
+        <label class="field-label" for="code">Code d’énigme partagé</label>
+        <div class="code-group">
+          <input id="code" class="code-input" maxlength="6" autocomplete="off" spellcheck="false" aria-label="Code de six caractères">
+          <button id="load-code" class="btn" type="button">Charger</button>
+          <button id="copy-code" class="btn" type="button">Copier</button>
+          <button id="new-code" class="btn" type="button">Nouveau</button>
+        </div>
+      </div>
+    </section>
+    <div class="message-top" id="top-message" role="status" aria-live="polite"></div>
+
+    <main class="workspace">
+      <section class="panel" id="reference-panel" aria-labelledby="reference-title">
+        <div class="panel-head"><div><h2 id="reference-title">Signal modèle</h2><p>À décrire par le Boss</p></div><div class="panel-actions"><button id="print-reference" class="btn print-btn" type="button">Imprimer le modèle</button><span class="role-tag">Boss</span></div></div>
+        <div class="plot-section">
+          <p class="print-code">Code d’énigme : <span id="print-code"></span></p>
+          <div class="phase-readout"><span class="phase-symbol" aria-hidden="true"></span><span>Début du motif :</span><strong id="reference-start">—</strong><span class="note">Trait violet = point de départ</span></div>
+          <div class="plot"><canvas id="reference-canvas" aria-label="Signal modèle statique avec grille et repère de phase, destiné à être lu comme sur papier."></canvas></div>
+        </div>
+      </section>
+
+      <section class="panel operator" id="operator-panel" aria-labelledby="operator-title">
+        <div class="panel-head"><div><h2 id="operator-title">Votre signal</h2><p>À ajuster par l’Employé</p></div><span class="role-tag">Employé</span></div>
+        <div class="plot-section">
+          <div class="phase-readout"><span class="phase-symbol" aria-hidden="true"></span><span>Début du motif :</span><strong id="operator-start">—</strong><span class="note">Trait violet = point de départ</span></div>
+          <div class="plot"><canvas id="operator-canvas" aria-label="Signal réglable avec grille et repère de phase."></canvas></div>
+        </div>
+      </section>
+    </main>
+
+    <section class="controls" id="control-panel" aria-labelledby="controls-title">
+      <div class="controls-header"><h2 id="controls-title">Réglages du signal</h2><span>3 molettes · 5 crans chacune</span></div>
+      <div class="control-grid" id="controls"></div>
+      <div class="validate-row"><div id="result" class="result" role="status" aria-live="polite">Alignez le début du motif, puis ajustez la forme et la hauteur de la courbe.</div><button id="validate" class="btn btn-primary" type="button">Tester le signal</button></div>
+    </section>
+
+    <p class="instructions" id="instructions"><strong>Pour jouer à deux :</strong> ouvrez ce même fichier, choisissez chacun un rôle et saisissez le même code. Le Boss décrit sa courbe, l’Employé règle la sienne. Les repères <strong>A à E</strong> indiquent où commence le motif ; la grille permet de décrire les hauteurs à l’œil, comme sur un document imprimé. Aucun partage d’écran nécessaire.</p>
+  </div>
+  <script>
+  (() => {
+    'use strict';
+    const $ = id => document.getElementById(id);
+    const amplitudes = [0, 25, 50, 75, 100];
+    const phases = [0, 72, 144, 216, 288];
+    const letters = ['A','B','C','D','E'];
+    const state = {role:'lab',code:'',target:[3,2,2],controls:[1,3,0]};
+    const cvs={reference:$('reference-canvas'),operator:$('operator-canvas')};
+    const tools=[
+      {title:'Onde arrondie',hint:'Sinusoïde · hauteur',icon:'sine'},
+      {title:'Onde carrée',hint:'Paliers · hauteur',icon:'square'},
+      {title:'Décalage',hint:'Phase globale · départ du motif',icon:'phase'}
+    ];
+    const iconMarkup={
+      sine:'<svg width="37" height="24" viewBox="0 0 37 24" fill="none" aria-hidden="true"><path d="M1 12C7 12 7 3 13 3s6 18 12 18 6-9 11-9" stroke="#2664dc" stroke-width="2.5" stroke-linecap="round"/></svg>',
+      square:'<svg width="37" height="24" viewBox="0 0 37 24" fill="none" aria-hidden="true"><path d="M1 19V5h17v14h18" stroke="#cc5c29" stroke-width="2.5" stroke-linejoin="round"/></svg>',
+      phase:'<svg width="37" height="24" viewBox="0 0 37 24" fill="none" aria-hidden="true"><path d="M2 12H35" stroke="#9a81cd" stroke-width="1.6" stroke-dasharray="3 3"/><path d="M22 5v14M18 9l4-4 4 4" stroke="#7a4ed2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    };
+    function seedNumber(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+    function randomFactory(seed){let s=seed>>>0;return()=>{s+=0x6D2B79F5;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}}
+    function generateTarget(code){const r=randomFactory(seedNumber(code));return [1+Math.floor(r()*4),1+Math.floor(r()*4),Math.floor(r()*5)]}
+    function makeCode(){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';const a=new Uint32Array(6);if(window.crypto&&window.crypto.getRandomValues)window.crypto.getRandomValues(a);else for(let i=0;i<6;i++)a[i]=Math.floor(Math.random()*4294967296);return Array.from(a,n=>chars[n%chars.length]).join('')}
+    function mod360(a){return ((a%360)+360)%360}
+    function waveParts(cfg,angle){const a=mod360(angle-phases[cfg[2]]);return {s:(amplitudes[cfg[0]]/100)*Math.sin(a*Math.PI/180),q:(amplitudes[cfg[1]]/100)*(a<180?1:-1),sign:a<180?1:-1}}
+    function wave(cfg,angle){const p=waveParts(cfg,angle);return p.s+p.q}
+    function controlChoice(i,j){
+      if(state.controls[i]===j)return;
+      state.controls[i]=j;
+      updateControls();render('operator');
+      $('result').className='result';
+      $('result').textContent='Ajustez le signal, puis testez lorsque les courbes correspondent.';
+    }
+    function dialAngle(step){return -120+step*60}
+    function dialSvg(){
+      let ticks='';
+      for(let i=0;i<5;i++){
+        const r=dialAngle(i)*Math.PI/180;
+        const x1=(76+Math.sin(r)*61).toFixed(2),y1=(76-Math.cos(r)*61).toFixed(2);
+        const x2=(76+Math.sin(r)*69).toFixed(2),y2=(76-Math.cos(r)*69).toFixed(2);
+        ticks+='<line class="dial-tick" data-tick="'+i+'" x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'"/>';
+      }
+      return '<svg viewBox="0 0 152 152" aria-hidden="true">'+ticks+
+        '<circle class="dial-face" cx="76" cy="76" r="49"/>'+
+        '<g class="dial-needle"><line class="dial-pointer" x1="76" y1="74" x2="76" y2="37"/><circle class="dial-hub" cx="76" cy="76" r="5"/></g></svg>';
+    }
+    function controlLabel(i,j){return i===2?letters[j]+' · '+phases[j]+'°':amplitudes[j]+'%'}
+    function updateControls(){
+      document.querySelectorAll('.dial').forEach(d=>{
+        const i=Number(d.dataset.control),j=state.controls[i];
+        d.querySelector('.dial-needle').setAttribute('transform','rotate('+dialAngle(j)+' 76 76)');
+        d.querySelectorAll('.dial-tick').forEach(t=>t.classList.toggle('active',Number(t.dataset.tick)===j));
+        d.setAttribute('aria-valuenow',String(j));
+        d.setAttribute('aria-valuetext',controlLabel(i,j));
+        $('dial-value-'+i).textContent=controlLabel(i,j);
+        const sub=$('dial-sub-'+i);
+        if(i===2)sub.textContent='Position '+letters[j];
+        d.closest('.control').querySelectorAll('.dial-scale span').forEach((item,n)=>item.classList.toggle('active',n===j));
+      });
+    }
+    function dialIndexFromPointer(d,event){
+      const bounds=d.getBoundingClientRect();
+      const dx=event.clientX-(bounds.left+bounds.width/2);
+      const dy=event.clientY-(bounds.top+bounds.height/2);
+      const angle=Math.atan2(dx,-dy)*180/Math.PI;
+      return Math.max(0,Math.min(4,Math.round((Math.max(-120,Math.min(120,angle))+120)/60)));
+    }
+    function buildControls(){const root=$('controls');root.innerHTML='';tools.forEach((item,i)=>{
+      const outer=document.createElement('div');outer.className='control';
+      const heading=document.createElement('div');heading.className='control-title';heading.innerHTML=iconMarkup[item.icon];
+      const title=document.createElement('strong');title.textContent=item.title;heading.append(title);
+      const hint=document.createElement('p');hint.textContent=item.hint;
+      const area=document.createElement('div');area.className='knob-area';
+      const dial=document.createElement('button');dial.type='button';dial.className='dial';dial.dataset.control=i;
+      dial.setAttribute('role','slider');dial.setAttribute('aria-label',item.title);
+      dial.setAttribute('aria-valuemin','0');dial.setAttribute('aria-valuemax','4');dial.setAttribute('aria-orientation','horizontal');
+      dial.setAttribute('title','Tourner la molette : glisser, utiliser la molette de la souris ou les flèches du clavier');
+      dial.innerHTML=dialSvg();
+      let tracking=false;
+      dial.addEventListener('pointerdown',event=>{if(event.button!==0)return;tracking=true;dial.setPointerCapture(event.pointerId);controlChoice(i,dialIndexFromPointer(dial,event));event.preventDefault()});
+      dial.addEventListener('pointermove',event=>{if(tracking)controlChoice(i,dialIndexFromPointer(dial,event))});
+      dial.addEventListener('pointerup',()=>{tracking=false});
+      dial.addEventListener('pointercancel',()=>{tracking=false});
+      dial.addEventListener('lostpointercapture',()=>{tracking=false});
+      dial.addEventListener('wheel',event=>{event.preventDefault();controlChoice(i,Math.max(0,Math.min(4,state.controls[i]+(event.deltaY>0?-1:1))))},{passive:false});
+      dial.addEventListener('keydown',event=>{
+        let next=state.controls[i];
+        if(event.key==='ArrowRight'||event.key==='ArrowUp')next++;
+        else if(event.key==='ArrowLeft'||event.key==='ArrowDown')next--;
+        else if(event.key==='Home')next=0;
+        else if(event.key==='End')next=4;
+        else return;
+        event.preventDefault();controlChoice(i,Math.max(0,Math.min(4,next)));
+      });
+      const value=document.createElement('div');value.className='dial-value';value.id='dial-value-'+i;
+      const sub=document.createElement('div');sub.className='dial-subvalue';sub.id='dial-sub-'+i;
+      const scale=document.createElement('div');scale.className='dial-scale';scale.setAttribute('aria-hidden','true');
+      for(let j=0;j<5;j++){const step=document.createElement('span');step.textContent=i===2?letters[j]:amplitudes[j];scale.append(step)}
+      const note=document.createElement('div');note.className='control-note';note.textContent=i===2?'A–E = début du motif':'0–100 % = hauteur de l’onde';
+      area.append(dial,value,sub,scale,note);
+      outer.append(heading,hint,area);root.append(outer);
+    });updateControls()}
+    function paintGraph(which){
+      const c=cvs[which];const rect=c.getBoundingClientRect();if(rect.width<10)return;
+      const dpr=Math.min(window.devicePixelRatio||1,2);const w=rect.width,h=rect.height;
+      if(c.width!==Math.round(w*dpr)||c.height!==Math.round(h*dpr)){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr)}
+      const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+      const left=49,right=22,top=31,bottom=44,pw=w-left-right,ph=h-top-bottom;
+      const x=a=>left+(a/360)*pw;
+      const y=v=>top+((2-v)/4)*ph;
+      ctx.font='12px system-ui, sans-serif';
+      // Grille fixe, identique chez l'expert et le technicien.
+      for(let level=-2;level<=2.001;level+=.5){const whole=Math.abs(level%1)<.01;ctx.beginPath();ctx.lineWidth=level===0?1.7:whole?1:.65;ctx.strokeStyle=level===0?'#b4beca':whole?'#dce2e9':'#edf0f4';ctx.moveTo(left,y(level));ctx.lineTo(left+pw,y(level));ctx.stroke();if(whole){ctx.fillStyle='#53606d';ctx.textAlign='right';ctx.fillText(level>0?'+'+level:level.toString(),left-10,y(level)+4)}}
+      for(let pos=0;pos<=5;pos++){const angle=pos*72;ctx.beginPath();ctx.strokeStyle='#e0e6ec';ctx.lineWidth=1;ctx.moveTo(x(angle),top);ctx.lineTo(x(angle),top+ph);ctx.stroke();ctx.fillStyle='#53606d';ctx.textAlign=pos===0?'left':pos===5?'right':'center';ctx.font='11px system-ui, sans-serif';ctx.fillText(angle+'°',x(angle),h-11);if(pos<5){ctx.fillStyle='#647281';ctx.font='700 12px system-ui, sans-serif';ctx.textAlign='center';ctx.fillText(letters[pos],x(angle),18)}}
+      // Trace du signal. Lors d'une inversion de l'onde carrée, on trace une verticale nette.
+      const cfg=which==='reference'?state.target:state.controls;
+      const color=which==='reference'?'#2664dc':'#cc5c29';
+      ctx.beginPath();let previous=waveParts(cfg,0);ctx.moveTo(x(0),y(previous.s+previous.q));
+      for(let a=.5;a<=360.001;a+=.5){const angle=Math.min(360,a);const p=waveParts(cfg,angle);if(p.sign!==previous.sign && amplitudes[cfg[1]]!==0){ctx.lineTo(x(angle),y(p.s+previous.q));ctx.lineTo(x(angle),y(p.s+p.q))}else{ctx.lineTo(x(angle),y(p.s+p.q))}previous=p}
+      ctx.strokeStyle=color;ctx.lineWidth=3.4;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
+      // Départ de phase : toujours la même couleur et le même emplacement logique.
+      const phase=phases[cfg[2]],xp=x(phase),vp=wave(cfg,phase);
+      ctx.save();ctx.strokeStyle='#7a4ed2';ctx.lineWidth=2;ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(xp,top);ctx.lineTo(xp,top+ph);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle='#7a4ed2';ctx.beginPath();ctx.moveTo(xp,top+2);ctx.lineTo(xp-7,top-9);ctx.lineTo(xp+7,top-9);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.arc(xp,y(vp),6,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle='#7a4ed2';ctx.lineWidth=2.6;ctx.stroke();ctx.restore();
+      $(which+'-start').textContent=letters[cfg[2]]+' · '+phase+'°';
+    }
+    function render(which){paintGraph(which)}
+    function redraw(){render('reference');render('operator')}
+    function setRole(role,updateLink=true){if(!['lab','expert','technician'].includes(role))role='lab';state.role=role;document.body.className='role-'+role;document.querySelectorAll('.mode').forEach(b=>{const yes=b.dataset.role===role;b.classList.toggle('active',yes);b.setAttribute('aria-pressed',String(yes))});if(updateLink)syncURL();requestAnimationFrame(redraw)}
+    function syncURL(){try{const url=new URL(location.href);url.searchParams.set('code',state.code);url.searchParams.set('role',state.role);history.replaceState(null,'',url.href)}catch(e){/* file:// sans History API, le code reste local */}}
+    function loadCode(input){const code=String(input).trim().toUpperCase();if(!/^[A-Z2-9]{6}$/.test(code)){$('top-message').textContent='Le code doit contenir exactement 6 lettres ou chiffres de 2 à 9.';return}state.code=code;state.target=generateTarget(code);state.controls=[1,3,0];$('code').value=code;$('print-code').textContent=code;$('top-message').textContent='';$('result').className='result';$('result').textContent='Alignez le début du motif, puis ajustez la forme et la hauteur de la courbe.';updateControls();syncURL();requestAnimationFrame(redraw)}
+    function validate(){const ok=state.controls.every((v,i)=>v===state.target[i]);const el=$('result');el.className='result '+(ok?'ok':'no');el.textContent=ok?'Signal reconnu ! Les deux courbes sont identiques.':'Signal différent. Continuez à ajuster votre courbe.'}
+    document.querySelectorAll('.mode').forEach(b=>b.addEventListener('click',()=>setRole(b.dataset.role)));
+    $('load-code').addEventListener('click',()=>loadCode($('code').value));
+    $('code').addEventListener('keydown',event=>{if(event.key==='Enter')loadCode($('code').value)});
+    $('new-code').addEventListener('click',()=>loadCode(makeCode()));
+    $('copy-code').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(state.code);$('top-message').textContent='Code copié.'}catch(e){$('code').focus();$('code').select();$('top-message').textContent='Code sélectionné : vous pouvez le copier.'}});
+    $('validate').addEventListener('click',validate);
+    $('print-reference').addEventListener('click',()=>window.print());
+    if('ResizeObserver'in window){const observer=new ResizeObserver(redraw);Object.values(cvs).forEach(c=>observer.observe(c))}else window.addEventListener('resize',redraw);
+    buildControls();const q=new URLSearchParams(location.search);setRole(q.get('role')||'lab',false);loadCode(q.get('code')||makeCode());
+  })();
+  </script>
+</body>
+</html>
